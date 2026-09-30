@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Getting Started with Node Development
 
 Welcome to Code the Dream's Node/Express class!
@@ -659,3 +660,6 @@ Ask for help when you are stuck. Setup issues are normal, especially when instal
 Copyright (c) 2025 Code the Dream
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+=======
+# ctd_node-homework
+>>>>>>> f1abadcbbeb604ace99c2c6ccb84fb08a883e2c1
