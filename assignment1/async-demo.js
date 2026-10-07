@@ -12,6 +12,17 @@ if (!fs.existsSync(dirPath)) {
 }
 fs.writeFileSync(filePath, content, 'utf8');
 
+/*
+ * Callback Hell Example:
+ * fs.readFile('file1.txt', (err, d1) => {
+ *   fs.readFile('file2.txt', (err, d2) => {
+ *     fs.readFile('file3.txt', (err, d3) => {
+ *       console.log(d1, d2, d3);
+ *     });
+ *   });
+ * });
+ */
+
 // 1. Callback Style
 fs.readFile(filePath, 'utf8', (err, data) => {
   if (err) return console.error(err);
