@@ -1,27 +1,30 @@
 const express = require('express');
-
 const app = express();
 
+global.user_id = null;
+global.users = [];
+global.tasks = [];
+
 const timeRouter = require('./routes/timeRoutes');
+const userRouter = require('./routes/userRoutes');
+const notFound = require('./middleware/not-found');
+const errorHandler = require('./middleware/error-handler');
 
 app.use(express.json());
 
 app.use('/api', timeRouter);
+app.use('/api/users', userRouter);
 
-app.get('/', (req, res) => {
-  res.send('Hello, World!');
-});
+app.use(notFound);
 
-app.post('/testpost', (req, res) => {
-  res.status(200).json({
-    message: 'POST route works',
-  });
-});
+app.use(errorHandler);
 
+// Server listener setup
 const port = process.env.PORT || 3000;
 
 const server = app.listen(port, () => {
   console.log(`Server is listening on port ${port}...`);
 });
 
+// Export { app, server }
 module.exports = { app, server };
