@@ -1,6 +1,7 @@
 if [ $# -gt 0 ]; then
-    pattern="^tdd/$1\\.test\\.js$"
+    # pattern="^tdd/$1\\.test\\.js$"
+    pattern="tdd/$1\.test\.js"
 else
     pattern="^tdd/.+\\.test\\.js"
 fi
-npx jest --testPathPattern "$pattern" --detectOpenHandles
+npx jest --testPathPatterns "$pattern" --detectOpenHandles
