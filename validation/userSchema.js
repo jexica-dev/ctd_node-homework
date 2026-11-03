@@ -3,7 +3,7 @@ const Joi = require('joi');
 const userSchema = Joi.object({
   email: Joi.string().trim().lowercase().email().required(),
   name: Joi.string().trim().min(3).max(30).required(),
-  password: Joi.string().required(),
+  password: Joi.string().min(6).required(),
 });
 
 module.exports = { userSchema };

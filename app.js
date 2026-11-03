@@ -7,6 +7,7 @@ global.tasks = [];
 
 const timeRouter = require('./routes/timeRoutes');
 const userRouter = require('./routes/userRoutes');
+const taskRouter = require('./routes/taskRoutes');
 const authMiddleware = require('./middleware/auth');
 
 const notFound = require('./middleware/not-found');
