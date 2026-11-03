@@ -7,6 +7,8 @@ global.tasks = [];
 
 const timeRouter = require('./routes/timeRoutes');
 const userRouter = require('./routes/userRoutes');
+const authMiddleware = require('./middleware/auth');
+
 const notFound = require('./middleware/not-found');
 const errorHandler = require('./middleware/error-handler');
 
@@ -14,6 +16,7 @@ app.use(express.json());
 
 app.use('/api', timeRouter);
 app.use('/api/users', userRouter);
+app.use('/api/tasks', authMiddleware, taskRouter);
 
 app.use(notFound);
 

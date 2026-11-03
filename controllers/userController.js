@@ -1,19 +1,55 @@
+const crypto = require('crypto');
+const util = require('util');
+const scrypt = util.promisify(crypto.scrypt);
+
+const { userSchema } = require('../validation/userSchema');
+
 if (!global.users) {
   global.users = [];
 }
 
-const register = (req, res) => {
-  const { name, email, password } = req.body;
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = await scrypt(password, salt, 64);
+  return `${salt}:${derivedKey.toString('hex')}`;
+}
+
+async function comparePassword(inputPassword, storedHash) {
+  if (!storedHash) return false;
+  const [salt, key] = storedHash.split(':');
+  const keyBuffer = Buffer.from(key, 'hex');
+  const derivedKey = await scrypt(inputPassword, salt, 64);
+  return crypto.timingSafeEqual(keyBuffer, derivedKey);
+}
+
+// Controller Actions
+const register = async (req, res) => {
+  if (!req.body) req.body = {};
+
+  const { error, value } = userSchema.validate(req.body, { abortEarly: false });
+
+  if (error) {
+    return res.status(400).json({
+      message: error.details.map((detail) => detail.message).join(', '),
+    });
+  }
+
+  const existingUser = global.users.find((u) => u.email === value.email);
+  if (existingUser) {
+    return res.status(400).json({ message: 'User already exists' });
+  }
+
+  const hashedPassword = await hashPassword(value.password);
 
   const newUser = {
     id: Date.now().toString(),
-    name,
-    email,
-    password,
+    name: value.name,
+    email: value.email,
+    hashedPassword,
   };
 
   global.users.push(newUser);
-  global.user_id = newUser;
+  global.user_id = { email: newUser.email, name: newUser.name };
 
   return res.status(201).json({
     name: newUser.name,
@@ -21,15 +57,20 @@ const register = (req, res) => {
   });
 };
 
-const logon = (req, res) => {
-  const { email, password } = req.body;
+const logon = async (req, res) => {
+  const { email, password } = req.body || {};
 
-  const user = global.users.find(
-    (u) => u.email === email && u.password === password,
-  );
+  if (!email || !password) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
 
-  if (user) {
-    global.user_id = user;
+  const user = global.users.find((u) => u.email === email);
+
+  const goodCredentials =
+    user && (await comparePassword(password, user.hashedPassword));
+
+  if (goodCredentials) {
+    global.user_id = { email: user.email, name: user.name };
     return res.status(200).json({
       name: user.name,
       email: user.email,
@@ -45,6 +86,8 @@ const logoff = (req, res) => {
 };
 
 module.exports = {
+  hashPassword,
+  comparePassword,
   register,
   logon,
   logoff,
