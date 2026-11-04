@@ -2,11 +2,8 @@ const crypto = require('crypto');
 const util = require('util');
 const scrypt = util.promisify(crypto.scrypt);
 
+const pool = require('../db/pg-pool');
 const { userSchema } = require('../validation/userSchema');
-
-if (!global.users) {
-  global.users = [];
-}
 
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -23,7 +20,7 @@ async function comparePassword(inputPassword, storedHash) {
 }
 
 // Controller Actions
-const register = async (req, res) => {
+const register = async (req, res, next) => {
   if (!req.body) req.body = {};
 
   const { error, value } = userSchema.validate(req.body, { abortEarly: false });
@@ -34,50 +31,59 @@ const register = async (req, res) => {
     });
   }
 
-  const existingUser = global.users.find((u) => u.email === value.email);
-  if (existingUser) {
-    return res.status(400).json({ message: 'User already exists' });
+  try {
+    const hashedPassword = await hashPassword(value.password);
+
+    const result = await pool.query(
+      `INSERT INTO users (email, name, hashed_password)
+       VALUES ($1, $2, $3)
+       RETURNING id, email, name`,
+      [value.email, value.name, hashedPassword],
+    );
+
+    const user = result.rows[0];
+    global.user_id = user.id;
+
+    return res.status(201).json({
+      name: user.name,
+      email: user.email,
+    });
+  } catch (e) {
+    if (e.code === '23505') {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    return next(e);
   }
-
-  const hashedPassword = await hashPassword(value.password);
-
-  const newUser = {
-    id: Date.now().toString(),
-    name: value.name,
-    email: value.email,
-    hashedPassword,
-  };
-
-  global.users.push(newUser);
-  global.user_id = { email: newUser.email, name: newUser.name };
-
-  return res.status(201).json({
-    name: newUser.name,
-    email: newUser.email,
-  });
 };
 
-const logon = async (req, res) => {
+const logon = async (req, res, next) => {
   const { email, password } = req.body || {};
 
   if (!email || !password) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  const user = global.users.find((u) => u.email === email);
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [
+      email,
+    ]);
+    const user = result.rows[0];
 
-  const goodCredentials =
-    user && (await comparePassword(password, user.hashedPassword));
+    const goodCredentials =
+      user && (await comparePassword(password, user.hashed_password));
 
-  if (goodCredentials) {
-    global.user_id = { email: user.email, name: user.name };
-    return res.status(200).json({
-      name: user.name,
-      email: user.email,
-    });
+    if (goodCredentials) {
+      global.user_id = user.id;
+      return res.status(200).json({
+        name: user.name,
+        email: user.email,
+      });
+    }
+
+    return res.status(401).json({ error: 'Invalid credentials' });
+  } catch (err) {
+    return next(err);
   }
-
-  return res.status(401).json({ error: 'Invalid credentials' });
 };
 
 const logoff = (req, res) => {
