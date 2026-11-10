@@ -2,8 +2,8 @@ const crypto = require('crypto');
 const util = require('util');
 const scrypt = util.promisify(crypto.scrypt);
 
-const pool = require('../db/pg-pool');
 const { userSchema } = require('../validation/userSchema');
+const prisma = require('../db/prisma');
 
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -20,6 +20,7 @@ async function comparePassword(inputPassword, storedHash) {
 }
 
 // Controller Actions
+
 const register = async (req, res, next) => {
   if (!req.body) req.body = {};
 
@@ -34,43 +35,45 @@ const register = async (req, res, next) => {
   try {
     const hashedPassword = await hashPassword(value.password);
 
-    const result = await pool.query(
-      `INSERT INTO users (email, name, hashed_password)
-       VALUES ($1, $2, $3)
-       RETURNING id, email, name`,
-      [value.email, value.name, hashedPassword],
-    );
+    const user = await prisma.user.create({
+      data: {
+        name: value.name,
+        email: value.email.toLowerCase(),
+        hashedPassword,
+      },
+      select: { name: true, email: true, id: true },
+    });
 
-    const user = result.rows[0];
     global.user_id = user.id;
 
     return res.status(201).json({
       name: user.name,
       email: user.email,
     });
-  } catch (e) {
-    if (e.code === '23505') {
+  } catch (err) {
+    if (err.name === 'PrismaClientKnownRequestError' && err.code === 'P2002') {
       return res.status(400).json({ message: 'User already exists' });
     }
-    return next(e);
+    return next(err);
   }
 };
 
 const logon = async (req, res, next) => {
-  const { email, password } = req.body || {};
-
-  if (!email || !password) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
   try {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [
-      email,
-    ]);
-    const user = result.rows[0];
+    let { email, password } = req.body || {};
+
+    if (!email || !password) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    email = email.toLowerCase();
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
 
     const goodCredentials =
-      user && (await comparePassword(password, user.hashed_password));
+      user && (await comparePassword(password, user.hashedPassword));
 
     if (goodCredentials) {
       global.user_id = user.id;
