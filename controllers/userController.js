@@ -21,7 +21,8 @@ async function comparePassword(inputPassword, storedHash) {
 
 // Controller Actions
 
-const register = async (req, res, next) => {
+// POST /api/users/register
+async function register(req, res, next) {
   if (!req.body) req.body = {};
 
   const { error, value } = userSchema.validate(req.body, { abortEarly: false });
@@ -34,29 +35,56 @@ const register = async (req, res, next) => {
 
   try {
     const hashedPassword = await hashPassword(value.password);
+    const { email, name } = value;
 
-    const user = await prisma.user.create({
-      data: {
-        name: value.name,
-        email: value.email.toLowerCase(),
-        hashedPassword,
-      },
-      select: { name: true, email: true, id: true },
+    const result = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: { email, name, hashedPassword },
+        select: { id: true, email: true, name: true, createdAt: true },
+      });
+
+      const welcomeTaskData = [
+        {
+          title: 'Complete your profile',
+          userId: newUser.id,
+          priority: 'medium',
+        },
+        { title: 'Add your first task', userId: newUser.id, priority: 'high' },
+        { title: 'Explore the app', userId: newUser.id, priority: 'low' },
+      ];
+      await tx.task.createMany({ data: welcomeTaskData });
+
+      const welcomeTasks = await tx.task.findMany({
+        where: {
+          userId: newUser.id,
+          title: { in: welcomeTaskData.map((t) => t.title) },
+        },
+        select: {
+          id: true,
+          title: true,
+          isCompleted: true,
+          userId: true,
+          priority: true,
+        },
+      });
+
+      return { user: newUser, welcomeTasks };
     });
 
-    global.user_id = user.id;
+    global.user_id = result.user.id;
 
     return res.status(201).json({
-      name: user.name,
-      email: user.email,
+      user: result.user,
+      welcomeTasks: result.welcomeTasks,
+      transactionStatus: 'success',
     });
   } catch (err) {
-    if (err.name === 'PrismaClientKnownRequestError' && err.code === 'P2002') {
-      return res.status(400).json({ message: 'User already exists' });
+    if (err.code === 'P2002') {
+      return res.status(400).json({ error: 'Email already registered' });
     }
     return next(err);
   }
-};
+}
 
 const logon = async (req, res, next) => {
   try {
@@ -96,8 +124,8 @@ const logoff = (req, res) => {
 
 module.exports = {
   hashPassword,
-  comparePassword,
   register,
   logon,
   logoff,
+  comparePassword,
 };

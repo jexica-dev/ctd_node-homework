@@ -8,6 +8,9 @@ const auth = require('../middleware/auth');
 // GET / -> index
 router.get('/', taskController.index);
 
+//
+router.post('/bulk', taskController.bulkCreate);
+
 // GET /:id -> show
 router.get('/:id', taskController.show);
 
