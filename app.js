@@ -29,11 +29,19 @@ app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
 
+// converts Express 5's read-only req.query getter into a writable object so the xss() sanitizer middleware can overwrite and sanitize URL query parameters without crashing the server.
+
 app.use((req, res, next) => {
-  if (req.body) req.body = sanitize(req.body);
-  if (req.params) req.params = sanitize(req.params);
+  Object.defineProperty(req, 'query', {
+    value: { ...req.query },
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
   next();
 });
+
+app.use(xss());
 
 app.get('/health', async (req, res) => {
   try {

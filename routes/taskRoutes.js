@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const jwtMiddleware = require('../middleware/jwtMiddleware');
 const taskController = require('../controllers/taskController');
-const auth = require('../middleware/auth');
 
 router.use(jwtMiddleware);
 
