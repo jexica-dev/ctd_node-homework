@@ -6,6 +6,7 @@ global.user_id = null;
 global.users = [];
 global.tasks = [];
 
+const analyticsRoutes = require('./routes/analyticsRoutes');
 const timeRouter = require('./routes/timeRoutes');
 const userRouter = require('./routes/userRoutes');
 const taskRouter = require('./routes/taskRoutes');
@@ -30,6 +31,7 @@ app.get('/health', async (req, res) => {
 app.use('/api', timeRouter);
 app.use('/api/users', userRouter);
 app.use('/api/tasks', authMiddleware, taskRouter);
+app.use('/api/analytics', authMiddleware, analyticsRoutes);
 
 app.use(notFound);
 
