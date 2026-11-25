@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const util = require('util');
 const scrypt = util.promisify(crypto.scrypt);
+const { randomUUID } = require('crypto');
+const jwt = require('jsonwebtoken');
 
 const { userSchema } = require('../validation/userSchema');
 const prisma = require('../db/prisma');
@@ -18,6 +20,21 @@ async function comparePassword(inputPassword, storedHash) {
   const derivedKey = await scrypt(inputPassword, salt, 64);
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 }
+
+const cookieFlags = (req) => {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // only when HTTPS is available
+    sameSite: 'Strict',
+  };
+};
+
+const setJwtCookie = (req, res, user) => {
+  const payload = { id: user.id, csrfToken: randomUUID() };
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+  res.cookie('jwt', token, { ...cookieFlags(req), maxAge: 3600000 });
+  return payload.csrfToken;
+};
 
 // Controller Actions
 
@@ -71,9 +88,12 @@ async function register(req, res, next) {
       return { user: newUser, welcomeTasks };
     });
 
-    global.user_id = result.user.id;
+    const csrfToken = setJwtCookie(req, res, result.user);
 
     return res.status(201).json({
+      name: result.user.name,
+      email: result.user.email,
+      csrfToken,
       user: result.user,
       welcomeTasks: result.welcomeTasks,
       transactionStatus: 'success',
@@ -104,10 +124,11 @@ const logon = async (req, res, next) => {
       user && (await comparePassword(password, user.hashedPassword));
 
     if (goodCredentials) {
-      global.user_id = user.id;
+      const csrfToken = setJwtCookie(req, res, user);
       return res.status(200).json({
         name: user.name,
         email: user.email,
+        csrfToken,
       });
     }
 
@@ -118,7 +139,7 @@ const logon = async (req, res, next) => {
 };
 
 const logoff = (req, res) => {
-  global.user_id = null;
+  res.clearCookie('jwt', cookieFlags(req));
   return res.status(200).json({ message: 'Successfully logged off' });
 };
 
@@ -128,4 +149,6 @@ module.exports = {
   logon,
   logoff,
   comparePassword,
+  cookieFlags,
+  setJwtCookie,
 };

@@ -1,26 +1,21 @@
 const express = require('express');
 const router = express.Router();
+const jwtMiddleware = require('../middleware/jwtMiddleware');
 const taskController = require('../controllers/taskController');
 const auth = require('../middleware/auth');
 
-// router.use(auth);
+router.use(jwtMiddleware);
 
-// GET / -> index
 router.get('/', taskController.index);
 
-//
 router.post('/bulk', taskController.bulkCreate);
 
-// GET /:id -> show
 router.get('/:id', taskController.show);
 
-// POST / -> create
 router.post('/', taskController.create);
 
-// PATCH /:id -> update
 router.patch('/:id', taskController.update);
 
-// DELETE /:id -> deleteTask
 router.delete('/:id', taskController.deleteTask);
 
 module.exports = router;
