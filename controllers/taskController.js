@@ -3,12 +3,13 @@ const prisma = require('../db/prisma');
 
 // GET /api/tasks (index)
 async function index(req, res, next) {
+  const userId = req.user.id;
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
 
-    const whereClause = { userId: global.user_id };
+    const whereClause = { userId };
     if (req.query.find) {
       whereClause.title = {
         contains: req.query.find,
@@ -71,12 +72,15 @@ async function index(req, res, next) {
       pagination,
     });
   } catch (err) {
-    return next(err);
+    if (next) return next(err);
+    throw err;
   }
 }
 
 // POST /api/tasks (create)
 async function create(req, res, next) {
+  const userId = req.user.id;
+
   if (!req.body) req.body = {};
 
   const { error, value } = taskSchema.validate(req.body, { abortEarly: false });
@@ -93,20 +97,22 @@ async function create(req, res, next) {
         title: value.title,
         isCompleted: value.isCompleted || false,
         priority: value.priority || 'medium',
-        userId: global.user_id,
+        userId,
       },
       select: { title: true, isCompleted: true, id: true, priority: true },
     });
 
     return res.status(201).json(task);
   } catch (err) {
-    return next(err);
+    if (next) return next(err);
+    throw err;
   }
 }
 
 // POST /api/tasks/bulk (bulkCreate)
 async function bulkCreate(req, res, next) {
   const { tasks } = req.body;
+  const userId = req.user.id;
 
   if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
     return res.status(400).json({
@@ -127,7 +133,7 @@ async function bulkCreate(req, res, next) {
       title: value.title,
       isCompleted: value.isCompleted || false,
       priority: value.priority || 'medium',
-      userId: global.user_id,
+      userId,
     });
   }
 
@@ -148,6 +154,7 @@ async function bulkCreate(req, res, next) {
 
 // GET /api/tasks/:id (show)
 async function show(req, res, next) {
+  const userId = req.user.id;
   const taskId = parseInt(req.params?.id, 10);
 
   if (isNaN(taskId) || taskId <= 0) {
@@ -159,7 +166,7 @@ async function show(req, res, next) {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId,
         },
       },
       select: {
@@ -189,6 +196,7 @@ async function show(req, res, next) {
 
 // PATCH /api/tasks/:id (update)
 async function update(req, res, next) {
+  const userId = req.user.id;
   if (!req.body) req.body = {};
 
   const { error, value } = patchTaskSchema.validate(req.body, {
@@ -213,7 +221,7 @@ async function update(req, res, next) {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId,
         },
       },
       select: { title: true, isCompleted: true, id: true, priority: true },
@@ -230,6 +238,7 @@ async function update(req, res, next) {
 
 // DELETE /api/tasks/:id (deleteTask)
 async function deleteTask(req, res, next) {
+  const userId = req.user.id;
   const taskId = parseInt(req.params?.id, 10);
 
   if (isNaN(taskId) || taskId <= 0) {
@@ -241,7 +250,7 @@ async function deleteTask(req, res, next) {
       where: {
         id_userId: {
           id: taskId,
-          userId: global.user_id,
+          userId,
         },
       },
       select: { title: true, isCompleted: true, id: true, priority: true },
